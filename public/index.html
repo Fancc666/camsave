@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>系统拍照裁切上传</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    img {
+      max-width: 100%;
+      display: block;
+    }
+    .img-container {
+      width: 100%;
+      max-height: 70vh;
+      overflow: hidden;
+      margin-top: 12px;
+      background: #000;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 14px;
+      font-size: 16px;
+      margin-right: 8px;
+    }
+    input[type="file"] {
+      margin-top: 10px;
+    }
+    #result {
+      margin-top: 12px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h2>系统拍照 + 裁切上传</h2>
+
+  <input id="fileInput" type="file" accept="image/*" capture="environment" />
+
+  <div class="img-container" id="imgContainer" style="display:none;">
+    <img id="image" alt="待裁切图片">
+  </div>
+
+  <div>
+    <button id="cropUploadBtn" style="display:none;">裁切并上传</button>
+    <button id="resetBtn" style="display:none;">重新拍摄</button>
+  </div>
+
+  <div id="result"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const imgContainer = document.getElementById('imgContainer');
+    const image = document.getElementById('image');
+    const cropUploadBtn = document.getElementById('cropUploadBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const result = document.getElementById('result');
+
+    let cropper = null;
+
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        image.src = reader.result;
+        imgContainer.style.display = 'block';
+        cropUploadBtn.style.display = 'inline-block';
+        resetBtn.style.display = 'inline-block';
+        result.textContent = '';
+
+        if (cropper) {
+          cropper.destroy();
+        }
+
+        cropper = new Cropper(image, {
+          viewMode: 1,
+          autoCropArea: 0.8,
+          movable: true,
+          zoomable: true,
+          rotatable: false,
+          scalable: false
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+
+    cropUploadBtn.addEventListener('click', async () => {
+      if (!cropper) {
+        result.textContent = '请先拍照';
+        return;
+      }
+
+      const canvas = cropper.getCroppedCanvas({
+        width: 1280,
+        imageSmoothingQuality: 'high'
+      });
+
+      if (!canvas) {
+        result.textContent = '裁切失败';
+        return;
+      }
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          result.textContent = '图片生成失败';
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('photo', blob, 'photo.jpg');
+
+        try {
+          const res = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+          });
+          const data = await res.json();
+          result.textContent = '上传结果:\n' + JSON.stringify(data, null, 2);
+        } catch (err) {
+          result.textContent = '上传失败: ' + err.message;
+        }
+      }, 'image/jpeg', 0.7);
+    });
+
+    resetBtn.addEventListener('click', () => {
+      fileInput.value = '';
+      image.src = '';
+      imgContainer.style.display = 'none';
+      cropUploadBtn.style.display = 'none';
+      resetBtn.style.display = 'none';
+      result.textContent = '';
+
+      if (cropper) {
+        cropper.destroy();
+        cropper = null;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -3,6 +3,7 @@ node_modules/
 
 # Uploaded images
 uploads/
+certs/*.pem
 
 # Logs
 logs/
